@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}BridgeGen - {% if version == 'elderly' %}For Seniors{% else %}Youth Feed{% endif %}{% endblock %}
+
+{% block content %}
+    <nav class="matt_navbar">
+        <div class="matt_navbar-inner">
+            <div class="matt_brand-wrap">
+                <div class="matt_brand-dot"></div>
+                <span class="matt_brand-text">BridgeGen</span>
+            </div>
+            <div class="matt_nav-tabs-custom">
+                <button class="matt_nav-tab matt_active">Forum</button>
+                <button class="matt_nav-tab">Stories</button>
+                <button class="matt_nav-tab">Leaderboard</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="matt_main-content">
+        <div class="matt_prompt-banner">
+            <div class="matt_prompt-header">
+                <span class="matt_prompt-icon">📖</span>
+                <span class="matt_prompt-label">Word of the Day</span>
+                <div class="matt_word-selector-wrapper" onclick="toggleWordDropdown(event)">
+                    <span class="matt_word-selector-label">📅 Browse:</span>
+                    <span class="matt_word-selector-value" id="wordSelectorValue">{{ word_of_day.word }} ({{ word_of_day.date }})</span>
+                    <span class="matt_word-selector-arrow">▼</span>
+                    <div class="matt_word-selector-dropdown" id="wordSelectorDropdown">
+                        {% for word in all_words %}
+                        <div class="matt_word-selector-option {% if word.id == word_of_day.id %}matt_active{% endif %}" 
+                             data-value="{{ word.id }}" 
+                             onclick="event.stopPropagation(); selectWord('{{ word.id }}')">
+                            <span class="matt_word-option-word">{{ word.word }}</span>
+                            <span class="matt_word-option-date">{{ word.date }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="matt_prompt-main">
+                <div class="matt_prompt-word-section">
+                    <div class="matt_prompt-word">{{ word_of_day.word }}</div>
+                    <div class="matt_prompt-phonetic">{{ word_of_day.phonetic }}</div>
+                </div>
+                <div class="matt_prompt-details">
+                    <div class="matt_prompt-desc">{{ word_of_day.description }}</div>
+                    <div class="matt_prompt-challenge">
+                        📝 <strong>Your Task:</strong> {{ word_of_day.challenge }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="matt_action-bar">
+            <div class="matt_action-bar-left">
+                <button class="matt_btn-post" onclick="openCreateModal()">+ {% if version == 'elderly' %}Share Story{% else %}Post{% endif %}</button>
+                <div class="matt_search-input-wrapper">
+                    <span class="matt_search-icon">🔍</span>
+                    <input type="text" class="matt_search-input" id="searchInput" placeholder="Search posts..." onkeyup="handleSearchKeyup(event)">
+                    <button class="matt_search-clear-btn" id="searchClearBtn" onclick="clearSearch()">×</button>
+                </div>
+            </div>
+            <div class="matt_filter-section">
+                <span class="matt_filter-label">Filter by:</span>
+                <button class="matt_filter-btn matt_active" data-filter="all">All</button>
+                <button class="matt_filter-btn" data-filter="youth">Youth</button>
+                <button class="matt_filter-btn" data-filter="senior">Elderly</button>
+            </div>
+        </div>
+
+        <div class="matt_search-results-header" id="searchResultsHeader">
+            <span id="searchResultsText"></span>
+            <button class="matt_btn-clear-search" onclick="clearSearch()">Clear search</button>
+        </div>
+
+        <div class="matt_posts-feed" id="postsFeed">
+        </div>
+
+        <div class="matt_version-switch">
+            {% if version == 'elderly' %}
+            <a href="{{ url_for('youth_feed', word_id=word_of_day.id) }}">Switch to Youth Version →</a>
+            {% else %}
+            <a href="{{ url_for('elderly_feed', word_id=word_of_day.id) }}">← Switch to Senior-Friendly Version</a>
+            {% endif %}
+        </div>
+    </main>
+
+    <div class="matt_modal-overlay" id="postDetailModal">
+        <div class="matt_modal-content">
+            <div class="matt_modal-header">
+                <span class="matt_modal-title">{% if version == 'elderly' %}Story{% else %}Post{% endif %}</span>
+                <button class="matt_btn-close-modal" onclick="closePostDetail()">×</button>
+            </div>
+            <div class="matt_modal-post-content" id="modalPostContent">
+            </div>
+            <div class="matt_comments-section" id="commentsSection">
+                <div class="matt_comments-header">Comments</div>
+                <form class="matt_comment-form" onsubmit="addComment(event)">
+                    <input type="text" class="matt_comment-input" id="commentInput" placeholder="Write a comment..." required>
+                    <button type="submit" class="matt_btn-comment">Post</button>
+                </form>
+                <div class="matt_comments-list" id="commentsList">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="matt_modal-overlay matt_create-modal" id="createPostModal">
+        <div class="matt_modal-content">
+            <div class="matt_modal-header">
+                <span class="matt_modal-title">{% if version == 'elderly' %}Share Your Story{% else %}Create Post{% endif %}</span>
+                <button class="matt_btn-close-modal" onclick="closeCreateModal()">×</button>
+            </div>
+            <form class="matt_create-form" onsubmit="createPost(event)">
+                <textarea class="matt_create-textarea" id="createPostText" placeholder="{% if version == 'elderly' %}Share your memory or story about today's word...{% else %}What's your take on today's word?{% endif %}"></textarea>
+                <div class="matt_media-preview-container" id="createMediaPreview"></div>
+                
+                <div class="matt_poll-toggle">
+                    <label class="matt_poll-toggle-label">
+                        <input type="checkbox" id="addPollCheckbox" onchange="togglePollForm()">
+                        <span>📊 Add a poll</span>
+                    </label>
+                </div>
+                
+                <div class="matt_poll-form" id="pollForm">
+                    <input type="text" class="matt_poll-question-input" id="pollQuestion" placeholder="Ask a question...">
+                    <div class="matt_poll-options-inputs" id="pollOptionsInputs">
+                        <input type="text" class="matt_poll-option-input" placeholder="Option 1">
+                        <input type="text" class="matt_poll-option-input" placeholder="Option 2">
+                    </div>
+                    <button type="button" class="matt_btn-add-option" onclick="addPollOption()">+ Add option</button>
+                </div>
+                
+                <div class="matt_create-actions">
+                    <label class="matt_media-upload-btn">
+                        <span>📷</span> Add {% if version == 'elderly' %}Photo{% else %}Media{% endif %}
+                        <input type="file" id="createMediaInput" accept="image/*,video/*" multiple hidden onchange="previewMedia(event, 'create')">
+                    </label>
+                    <button type="submit" class="matt_btn-create-post" id="createPostBtn">{% if version == 'elderly' %}Share{% else %}Post{% endif %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="matt_modal-overlay matt_create-modal" id="editPostModal">
+        <div class="matt_modal-content">
+            <div class="matt_modal-header">
+                <span class="matt_modal-title">{% if version == 'elderly' %}Edit Story{% else %}Edit Post{% endif %}</span>
+                <button class="matt_btn-close-modal" onclick="closeEditModal()">×</button>
+            </div>
+            <form class="matt_edit-form" onsubmit="saveEditPost(event)">
+                <textarea class="matt_create-textarea" id="editPostText" placeholder="{% if version == 'elderly' %}Edit your story...{% else %}Edit your post...{% endif %}"></textarea>
+                <div class="matt_media-preview-container" id="editMediaPreview"></div>
+                <div class="matt_create-actions">
+                    <label class="matt_media-upload-btn">
+                        <span>📷</span> Add {% if version == 'elderly' %}Photo{% else %}Media{% endif %}
+                        <input type="file" id="editMediaInput" accept="image/*,video/*" multiple hidden onchange="previewMedia(event, 'edit')">
+                    </label>
+                    <button type="submit" class="matt_btn-create-post">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="matt_modal-overlay matt_confirm-modal" id="confirmModal">
+        <div class="matt_modal-content">
+            <div class="matt_confirm-icon">⚠️</div>
+            <div class="matt_confirm-title">Delete this?</div>
+            <div class="matt_confirm-message" id="confirmMessage">This action cannot be undone.</div>
+            <div class="matt_confirm-actions">
+                <button type="button" class="matt_btn-confirm-cancel" onclick="closeConfirmModal()">Cancel</button>
+                <button type="button" class="matt_btn-confirm-delete" onclick="executeDelete()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="matt_notification-fab" id="notificationWrapper">
+        <button class="matt_notification-fab-btn" onclick="toggleNotifications()">
+            🔔
+            <span class="matt_notification-badge" id="notificationBadge">0</span>
+        </button>
+        <div class="matt_notification-dropdown" id="notificationDropdown">
+            <div class="matt_notification-header">
+                <span>Notifications</span>
+                <div class="matt_notification-header-actions">
+                    <button class="matt_btn-mark-all-read" onclick="markAllNotificationsRead()">Mark all read</button>
+                    <button class="matt_btn-clear-all" onclick="clearAllNotifications()">Clear all</button>
+                </div>
+            </div>
+            <div class="matt_notification-list" id="notificationList">
+            </div>
+        </div>
+    </div>
+
+    <div class="matt_toast-container">
+        <div class="matt_toast" id="toast"></div>
+    </div>
+
+    <script>
+        const CURRENT_WORD_ID = parseInt("{{ word_of_day.id }}");
+    </script>
+{% endblock %}
